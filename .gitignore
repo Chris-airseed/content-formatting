@@ -1,3 +1,11 @@
+# Testing
+tests/
+examples/02_floating_nav/app/
+examples/02_floating_nav/lua_log.txt
+examples/01_basic_nav/app/
+examples/01_basic_nav/lua_log.txt
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -31,6 +31,8 @@ Modern browsers block JavaScript `fetch()` calls for local files (`file://` URLs
 2. Navigate to the project folder:
    ```sh
    cd /path/to/docx-to-html-project
+   Example:
+   cd Airseed/repo/content-formatting/examples/02_floating_nav/app/grovia_Carbon-PRO_Template
    ```
 3. Start a local server:
    - **Python 3:**
@@ -44,6 +46,10 @@ Modern browsers block JavaScript `fetch()` calls for local files (`file://` URLs
 4. Open your browser and visit:
    ```plaintext
    http://localhost:8000/index.html
+   ```
+5. Upon editing refresh and clear cache with:
+   ```plaintext
+   ctrl + shift + R
    ```
 
 ### **Method 2: Using Node.js (Alternative)**
