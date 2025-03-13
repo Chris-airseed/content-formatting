@@ -1,5 +1,7 @@
 # Testing
 tests/
+examples/03_multi-page/app/
+examples/03_multi-page/lua_log.txt
 examples/02_floating_nav/app/
 examples/02_floating_nav/lua_log.txt
 examples/01_basic_nav/app/
