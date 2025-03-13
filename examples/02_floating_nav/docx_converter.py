@@ -394,7 +394,7 @@ def extract_table_format(doc_path, default_styles: dict = DEFAULT_STYLES):
                             text_parts.append(part)
 
                 # Default to single text if no formatting is found
-                if len(text_parts) == 1 and "bold" not in text_parts[0] and "superscript" not in text_parts[0] and "subscript" not in text_parts[0] and "color" not in text_parts[0]:
+                if len(text_parts) == 1:
                     actual_style = {
                         "text": text_parts[0]["text"].replace("\n", "<br>"),
                     }

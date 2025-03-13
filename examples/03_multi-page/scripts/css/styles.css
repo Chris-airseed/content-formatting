@@ -1,0 +1,176 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 20px;
+    padding-top: 50px; /* Prevent content from being hidden behind the fixed nav */
+}
+
+table {
+    width: 50%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    padding: 20px;
+    border: 1px solid #ccc;
+}
+
+section, h1, h2, h3 {
+    scroll-margin-top: 140px; /* Adjust based on the nav height */
+}
+
+
+nav {
+    background: #f8f9fa;
+    padding: 0px;
+    padding-left: 20px;
+    margin-bottom: 10px;
+    position: fixed;  /* Fix it to the top */
+    top: 0;           /* Stick to the top */
+    left: 0;
+    width: 100%;
+    z-index: 1000;   /* Ensure it stays above other elements */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional shadow effect */
+}
+
+
+.nav-h1 {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+    padding: 0;
+}
+
+.nav-h1 > .nav-item {
+    position: relative;
+}
+
+/* Default state for top-level nav links */
+.nav-h1 > .nav-item > a {
+    text-decoration: none;
+    font-weight: 400;
+    padding: 5px 10px;
+    display: inline-block;
+    color: #666; /* Lighter text color */
+    font-size: 14px;
+    /* transition: color 0.3s ease-in-out; */
+}
+
+/* Active/Selected state for H1 */
+.nav-h1 > .nav-item.active > a,
+.nav-h1 > .nav-item > a:hover {
+    color: #1c2e5a; /* Darker blue */
+    /* font-weight: bold; */
+}
+
+/* Underline effect for active H1 */
+.nav-h1 > .nav-item.active > a::after {
+    content: "";
+    display: block;
+    height: 2px;
+    background-color: #1c2e5a;
+    width: 100%;
+    margin-top: 3px;
+}
+
+/* H2 & H3 Navigation (Dropdowns) */
+.nav-h2, .nav-h3 {
+    list-style: none;
+    position: absolute;
+    background: #fff;
+    padding: 5px 0;
+    border: 1px solid #ddd;
+    min-width: 200px;
+    display: none;
+    z-index: 100;
+}
+
+/* Show H2 dropdown on hover */
+.nav-h1 > .nav-item:hover > .nav-h2 {
+    display: block;
+    top: 100%;
+    left: 0;
+}
+
+.nav-h2 > .nav-item {
+    position: relative;
+}
+
+/* Show H3 sub-dropdown on hover
+.nav-h2 > .nav-item:hover > .nav-h3 {
+    display: block;
+    top: 0;
+    left: 100%;
+} */
+
+/* Hover Effect for H2 */
+.nav-h2 > .nav-item > a {
+    text-decoration: none;
+    font-weight: 400;
+    padding: 8px 15px;
+    display: block;
+    color: #666;
+    /* transition: color 0.3s ease-in-out; */
+}
+
+/* Hover effect for H2 (same as selected H1 style) */
+.nav-h2 > .nav-item:hover > a {
+    color: #1c2e5a; /* Darker blue */
+    /* font-weight: bold; */
+}
+
+/* Underline effect for hovered H2 */
+.nav-h2 > .nav-item:hover > a::after {
+    content: "";
+    display: block;
+    height: 2px;
+    background-color: #1c2e5a;
+    width: 100%;
+    margin-top: 3px;
+}
+
+
+.sub-nav {
+    padding: 10px 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: #fff;
+    /* transition: all 0.3s ease-in-out; */
+}
+
+/* When sub-nav is fixed */
+.sub-nav.fixed {
+    position: fixed;
+    top: 60px; /* Sticks below the main nav */
+    left: 0;
+    padding-left: 20px;
+    width: 100%;
+    z-index: 999;
+    background: white;
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+}
+
+/* When sub-nav reaches last H2, stop it */
+.sub-nav.stop {
+    position: absolute !important;
+    width: 100%;
+}
+
+
+.sub-nav-item {
+    display: inline-block;
+    background-color: #1D426F;
+    color: white;
+    border: 2px solid black;
+    font-family: 'Poppins', sans-serif;
+    padding: 6px 20px;
+    border-radius: 50px;
+    text-decoration: none;
+    /* transition: background 0.3s, color 0.3s; */
+}
+.sub-nav-item:hover {
+    background-color: #F2F2F2;
+    color: #1D426F;
+    border: 2px solid black;
+}
