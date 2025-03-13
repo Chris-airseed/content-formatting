@@ -375,33 +375,73 @@ def extract_table_format(doc_path, default_styles: dict = DEFAULT_STYLES):
 
                 # Extract formatting and text as separate parts
                 text_parts = []
-                for para in cell.paragraphs:
-                    if para.text.strip():
-                        for run in para.runs:
-                            part = {"text": run.text}
-                            if run.bold:
-                                part["bold"] = True
-                            if run.italic:
-                                part["italic"] = True
-                            if run.font.superscript:
-                                part["superscript"] = True
-                            if run.font.subscript:
-                                part["subscript"] = True
-                            if run.font.color and run.font.color.rgb:
-                                part["color"] = f"#{run.font.color.rgb}"
-                            if run.font.size:
-                                part["fontSize"] = convert_pt_to_rem(run.font.size.pt)
-                            text_parts.append(part)
+                prev_para = None  # Track previous paragraph for detecting paragraph breaks
 
-                # Default to single text if no formatting is found
-                if len(text_parts) == 1:
+                for para in cell.paragraphs:
+                    if para.text.strip() or any(run.text.strip() for run in para.runs):  # Ignore empty paragraphs
+                        # Insert newline if this is a new paragraph (except for the first one)
+                        if prev_para is not None:
+                            text_parts.append({"text": "\n", "newline": True})
+
+                        prev_para = para  # Update previous paragraph tracker
+
+                        for run in para.runs:
+                            if run.text:
+                                # Handle inline newlines within a run
+                                segments = run.text.split("\n")
+                                for i, segment in enumerate(segments):
+                                    part = {"text": segment}
+                                    if run.bold:
+                                        part["bold"] = True
+                                    if run.italic:
+                                        part["italic"] = True
+                                    if run.font.superscript:
+                                        part["superscript"] = True
+                                    if run.font.subscript:
+                                        part["subscript"] = True
+                                    if run.font.color and run.font.color.rgb:
+                                        part["color"] = f"#{run.font.color.rgb}"
+                                    if run.font.size:
+                                        part["fontSize"] = convert_pt_to_rem(run.font.size.pt)
+
+                                    text_parts.append(part)
+
+                                    # If this was a split part, add an explicit newline
+                                    if i < len(segments) - 1:
+                                        text_parts.append({"text": "\n", "newline": True})
+
+                # Check if any part has formatting
+                has_formatting = any(len(part) > 1 for part in text_parts if part["text"] != "\n")
+
+                # Check if all formatted parts share the same styling
+                def extract_format(part):
+                    """Extracts formatting keys (excluding text) from a part."""
+                    return {k: v for k, v in part.items() if k not in ["text", "newline"]}
+
+                common_format = extract_format(text_parts[0]) if text_parts else {}
+                all_same_format = all(extract_format(part) == common_format for part in text_parts if part["text"] != "\n")
+
+                # Handle different cases
+                if not text_parts:  # No text, return empty string
+                    actual_style = {"text": ""}
+                elif not has_formatting:  # Merge unformatted text, preserving newlines
                     actual_style = {
-                        "text": text_parts[0]["text"].replace("\n", "<br>"),
+                        "text": "".join(
+                            part["text"] if "newline" not in part else "<br>"
+                            for part in text_parts
+                        )
                     }
-                else:
+                elif all_same_format:  # Merge text and apply common formatting at the top level, preserving newlines
                     actual_style = {
-                        "textParts": text_parts
+                        "text": "".join(
+                            part["text"] if "newline" not in part else "<br>"
+                            for part in text_parts
+                        ),
+                        **common_format  # Apply the shared formatting
                     }
+                else:  # Mixed formatting, keep textParts
+                    actual_style = {"textParts": text_parts}
+
 
                 # Handle merged cells
                 merge_info = is_cell_merged(cell, row_idx, col_idx, merge_tracker)
