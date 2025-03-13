@@ -684,10 +684,12 @@ def insert_sub_navigation(html_content, nav_json):
     
     return html_content
 
+
+
 ## Image html replacement
 def replace_images_with_placeholders(html_content, alt_text_map):
     """
-    Replace images with placeholders using regex and store alt text in alt_text_map.
+    Replace images with placeholders using regex and store alt text & figcaptions in alt_text_map.
 
     Args:
         html_content (str): The HTML content containing images.
@@ -697,29 +699,42 @@ def replace_images_with_placeholders(html_content, alt_text_map):
         tuple: Modified HTML content (str) and updated alt_text_map (dict).
     """
 
-    # Updated regex to match <img> tags regardless of attribute order
-    img_pattern = re.compile(
-        r'<img[^>]*src=["\']([^"\']+)["\'][^>]*alt=["\']([^"\']*)["\'][^>]*>',
-        re.IGNORECASE
+    # Regex to match <figure> elements containing <img> and <figcaption>
+    figure_pattern = re.compile(
+        r'<figure[^>]*>\s*(<img[^>]*src=["\']([^"\']+)["\'][^>]*alt=["\']([^"\']*)["\'][^>]*>)\s*(<figcaption[^>]*>(.*?)</figcaption>)?\s*</figure>',
+        re.IGNORECASE | re.DOTALL
     )
 
     def replacer(match):
-        img_src = match.group(1)  # Extract src
-        #print(img_src)
-        alt_text = match.group(2) if match.group(2) else ""  # Extract alt (if exists)
-        #print(alt_text)
+        img_src = match.group(2)  # Extract src
+        alt_text = match.group(3) if match.group(3) else ""  # Extract alt text
+        figcaption_text = match.group(5).strip() if match.group(5) else ""  # Extract figcaption text
+
         img_id = os.path.splitext(os.path.basename(img_src))[0]  # Extract image ID
 
-        # Store alt text if not already in map
-        alt_text_map[img_id]['alt_text'] = alt_text.removeprefix(ALT_TEXT_KEEP_PREFIX) if alt_text else ""
+        # Ensure the image ID exists in alt_text_map
+        if img_id not in alt_text_map:
+            alt_text_map[img_id] = {}
 
-        # Replace <img> with a <div> preserving the alt text or placeholder
-        return f'<div data-image="{alt_text_map[img_id]['path']}">{alt_text_map[img_id]['alt_text']}</div><br>'
+        # Escape caption for safe HTML attribute inclusion
+        figcaption_escaped = html.escape(figcaption_text)
+
+        # Store alt text and figcaption in alt_text_map
+        alt_text_map[img_id]['alt_text'] = alt_text.removeprefix(ALT_TEXT_KEEP_PREFIX) if alt_text else ""
+        alt_text_map[img_id]['figcaption'] = figcaption_text  # Store the unescaped caption for later use
+
+        # ✅ Store caption inside the div like tables (escaped for HTML safety)
+        placeholder_html = f'<div data-image="{alt_text_map[img_id]["path"]}" data-caption="{figcaption_escaped}">{alt_text_map[img_id]["alt_text"]}</div><br>'
+
+        return placeholder_html
 
     # Apply regex replacement
-    modified_html = re.sub(img_pattern, replacer, html_content)
+    modified_html = re.sub(figure_pattern, replacer, html_content)
 
     return modified_html, alt_text_map
+
+
+
 
 
 

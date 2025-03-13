@@ -10,7 +10,7 @@ table {
     margin-top: 20px;
 }
 
-.table-caption {
+figcaption, .table-caption {
     font-family: 'Poppins', sans-serif;
     font-style: italic;
     font-size: 0.8rem;
@@ -19,19 +19,7 @@ table {
     caption-side: top; /* Ensures caption is above the table */
 }
 
-figure {
-    margin: 0;
-    padding: 0;
-}
 
-.figurecaption {
-    font-family: 'Poppins', sans-serif;
-    font-style: italic;
-    font-size: 0.8rem;
-    text-align: left;
-    margin-bottom: 5px;
-    caption-side: top; /* Ensures caption is above the table */
-}
 
 th, td {
     padding: 20px;
