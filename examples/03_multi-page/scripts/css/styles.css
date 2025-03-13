@@ -15,9 +15,19 @@ th, td {
     border: 1px solid #ccc;
 }
 
-section, h1, h2, h3 {
-    scroll-margin-top: 140px; /* Adjust based on the nav height */
+/* Ensure sections and headings don't get covered */
+.h1-section, h1, h2, h3 {
+    scroll-margin-top: 120px; /* Adjust based on nav height */
 }
+
+.h1-section {
+    display: none; /* Hide all sections by default */
+}
+
+.h1-section:first-of-type {
+    display: block; /* Show only the first section on page load */
+}
+
 
 
 nav {
