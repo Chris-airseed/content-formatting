@@ -2,6 +2,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     await loadContent();
 });
 
+function addBrAfterParagraphs() {
+    document.querySelectorAll("#content p").forEach(paragraph => {
+        let br = document.createElement("br");
+        paragraph.insertAdjacentElement("afterend", br);
+    });
+}
+
 async function loadContent() {
     try {
         const [htmlRes, stylesRes, tablesRes] = await Promise.all([
@@ -26,10 +33,14 @@ async function loadContent() {
             loadNavigation();
         }
 
+        // 🔹 Add <br> after each <p> AFTER content is loaded
+        addBrAfterParagraphs();
+
     } catch (error) {
         console.error("❌ Error loading content:", error);
     }
 }
+
 
 function applyStyles(styles) {
     if (!styles) return;
@@ -63,12 +74,15 @@ function applyStyles(styles) {
 function renderTables(tables, globalStyles) {
     document.querySelectorAll("[data-table]").forEach(div => {
         const tableId = div.getAttribute("data-table");
+        const caption = div.getAttribute("data-caption") || ""; // Extract caption from div
+
         if (tables[tableId]) {
-            console.log(`Rendering table: ${tableId}`);
-            div.innerHTML = generateTable(tables[tableId], globalStyles);
+            console.log(`Rendering table: ${tableId}, Caption: ${caption}`);
+            div.innerHTML = generateTable(tables[tableId], globalStyles, caption);
         } else {
             console.error(`Table ID ${tableId} not found in tables.json`);
             div.innerHTML = `<p>Table ${tableId} not found</p>`;
         }
     });
 }
+

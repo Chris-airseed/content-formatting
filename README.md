@@ -93,6 +93,9 @@ Once the local server is running, `index.html` should:
 - If tables do not appear, check **console errors** (press `F12` → Console in Chrome/Firefox).
 - If styling does not apply, verify `styles.json` is correctly formatted.
 
+## Known issues
+- Figures with page breaks in the same line will not be considered figures by pypandoc and the code will not remove the figure caption text. Removing the page breaks programatically or replacing with new lines or new paragraphs does not yield the same result as manually hitting enter between an image and a page break (fixes it).
+
 ## Next Steps
 
 You can extend this by:

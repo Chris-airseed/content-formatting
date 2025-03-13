@@ -1,6 +1,27 @@
 -- Removes first 3 blocks from docx file to remove title page of the document
 -- Removes images from docx file based on metadata.keep_images
 
+
+-- Removes all page breaks that interfere with the conversion to HTML 
+-- Works but didn't fix issue with figures with page breaks directly after them not being considered as figures
+-- function Para (elem)
+--     local new_content = {}
+
+--     for i, item in ipairs(elem.content) do
+--         -- Detect OpenXML page break tags and replace them with a newline
+--         if item.t == "RawInline" and item.format == "openxml" and string.match(item.text, "<w:br w:type=[\"']page[\"']") then
+--             table.insert(new_content, pandoc.RawInline("openxml", "<w:p></w:p>"))  -- Insert a new paragraph
+--         else
+--             table.insert(new_content, item)
+--         end
+--     end
+
+--     -- Replace paragraph content with modified content
+--     elem.content = new_content
+--     return elem
+-- end
+
+
 local image_counter = 0
 local keep_set = {} -- Lookup table of images to keep
 local image_positions = {} -- Maps image index to element

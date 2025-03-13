@@ -1,7 +1,8 @@
-function generateTable(tableData, globalStyles) {
+function generateTable(tableData, globalStyles, caption = "") {
     if (!tableData) return "<p>Table not found</p>";
 
     console.log("Generating table with data:", tableData);
+    console.log("Table Caption Passed:", caption);
 
     if (!tableData.rows || !Array.isArray(tableData.rows)) {
         console.error("Error: tableData.rows is missing or not an array.", tableData.rows);
@@ -17,6 +18,11 @@ function generateTable(tableData, globalStyles) {
                                     width: ${tableStyles.width || 'auto'}; 
                                     border-collapse: ${tableStyles.borderCollapse || 'collapse'}; 
                                     margin-bottom: ${tableStyles.marginBottom || '10px'};">`;
+
+    // ✅ Use the extracted caption
+    if (caption) {
+        tableHTML += `<caption class="table-caption">${caption}</caption>`;
+    }
 
     // Generate headers
     if (tableData.headers && Array.isArray(tableData.headers)) {
@@ -36,8 +42,6 @@ function generateTable(tableData, globalStyles) {
     // Generate rows
     tableHTML += "<tbody>";
     tableData.rows.forEach((row, rowIndex) => {
-        // console.log(`Processing Row ${rowIndex}:`, row);
-
         if (!Array.isArray(row)) {
             console.error(`Error: Row ${rowIndex} is not an array`, row);
             return;
@@ -45,8 +49,6 @@ function generateTable(tableData, globalStyles) {
 
         tableHTML += "<tr>";
         row.forEach((cell, colIndex) => {
-            // console.log(`Row ${rowIndex}, Column ${colIndex} Cell Data:`, cell);
-
             let defaultStyle = colIndex === 0 ? td1Styles : tdStyles;
 
             let styleStr = `background-color: ${cell.backgroundColor || defaultStyle.backgroundColor || 'transparent'}; 
@@ -61,38 +63,23 @@ function generateTable(tableData, globalStyles) {
 
             let cellText = "";
 
-            // Handle new format with text parts
+            // Handle text parts
             if (cell.textParts && Array.isArray(cell.textParts)) {
                 cellText = cell.textParts.map(part => {
                     let formattedText = part.text;
 
-                    if (part.bold) {
-                        formattedText = `<b>${formattedText}</b>`;
-                    }
-                    if (part.superscript) {
-                        formattedText = `<sup>${formattedText}</sup>`;
-                    }
-                    if (part.subscript) {
-                        formattedText = `<sub>${formattedText}</sub>`;
-                    }
-                    if (part.italic) {
-                        formattedText = `<i>${formattedText}</i>`;
-                    }
-                    if (part.underline) {
-                        formattedText = `<u>${formattedText}</u>`;
-                    }
-                    if (part.strikethrough) {
-                        formattedText = `<del>${formattedText}</del>`;
-                    }
-                    if (part.color) {
-                        formattedText = `<span style="color: ${part.color}">${formattedText}</span>`;
-                    }
+                    if (part.bold) formattedText = `<b>${formattedText}</b>`;
+                    if (part.superscript) formattedText = `<sup>${formattedText}</sup>`;
+                    if (part.subscript) formattedText = `<sub>${formattedText}</sub>`;
+                    if (part.italic) formattedText = `<i>${formattedText}</i>`;
+                    if (part.underline) formattedText = `<u>${formattedText}</u>`;
+                    if (part.strikethrough) formattedText = `<del>${formattedText}</del>`;
+                    if (part.color) formattedText = `<span style="color: ${part.color}">${formattedText}</span>`;
 
                     return formattedText;
-                }).join(""); // Join the text parts to form full content
+                }).join(""); // Join formatted text parts
             } else if (cell.text) {
-                // Fallback for single text value
-                cellText = cell.text.replace(/\n/g, "<br>");
+                cellText = cell.text.replace(/\n/g, "<br>"); // Ensure line breaks are preserved
             }
 
             tableHTML += `<td ${colspan} ${rowspan} style="${styleStr}">${cellText}</td>`;

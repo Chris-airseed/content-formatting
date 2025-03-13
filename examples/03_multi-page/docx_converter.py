@@ -11,6 +11,7 @@ import os
 import zipfile
 import shutil
 import xml.etree.ElementTree as ET
+import html  # Ensure this is imported
 
 # Define the prefix for alt text that should be kept in the output
 ALT_TEXT_KEEP_PREFIX = "keep-"
@@ -521,6 +522,7 @@ def extract_alt_texts(doc_xml_path, image_map, allowed_alt_texts, extracted_fold
 
     # Create the output folder for images
     media_folder = os.path.join(output_path, image_folder)
+    print(f"📂 Creating media folder: {media_folder}")
     os.makedirs(image_folder, exist_ok=True)
     
     if os.path.exists(doc_xml_path):
@@ -588,9 +590,30 @@ def generate_lua_lookup_table(image_numbers):
 
     return metadata_json
 
-# Replace tables sequentially with placeholders
+def remove_empty_figures(html):
+    # Regex pattern to match <figure> tags that do not contain an <img>
+    pattern = re.compile(r'<figure>(?:(?!<img).)*?</figure>', re.DOTALL)
+
+    # Remove matching <figure> elements
+    cleaned_html = re.sub(pattern, '', html)
+
+    return cleaned_html
+
+
+# Function to replace tables and store captions safely
 def table_replacer(match, counter=[0]):
-    replacement = f'<div data-table="table_{counter[0]}"></div>'
+    table_html = match.group(0)
+
+    # Extract caption if present
+    caption_match = re.search(r'<caption.*?>(.*?)</caption>', table_html, re.DOTALL)
+    caption_text = caption_match.group(1).strip() if caption_match else ""
+
+    # Escape caption for safe inclusion in HTML attributes
+    caption_escaped = html.escape(caption_text)  # <-- This should work now
+
+    # Replace table with a div containing the caption as a data attribute
+    replacement = f'<div data-table="table_{counter[0]}" data-caption="{caption_escaped}"></div>'
+    
     counter[0] += 1
     return replacement
 
