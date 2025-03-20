@@ -36,6 +36,23 @@ GLOBAL_DEFAULT_STYLES = {
     "verticalAlign": "middle"
 }
 
+def check_compatibility(docx_path, output_path):
+    """Check compatibility of docx file and fix or flag any potential issues."""
+    ## Load the document
+    doc = Document(docx_path)
+    ## normalize empty paragraphs in a DOCX file
+    def normalize_empty_paragraphs(doc):      
+        for para in doc.paragraphs:
+            # Check if the paragraph is empty but has a non-Normal style
+            if not para.text.strip() and para.style.name != "Normal":
+                para.style = doc.styles["Normal"]
+        return doc
+
+    doc = normalize_empty_paragraphs(doc)
+    # Save the modified document
+    doc.save(output_path)
+    print(f"Compatible document saved as: {output_path}")
+
 # Function to map Word vertical alignment values to CSS
 def map_vertical_align(word_val: str) -> str:
     """Convert Word's vertical alignment values to CSS equivalents."""
@@ -600,6 +617,17 @@ def remove_empty_figures(html):
     return cleaned_html
 
 
+def remove_empty_paragraphs(html):
+    if not isinstance(html, str):  # Ensure input is a string
+        raise TypeError(f"Expected a string, but got {type(html).__name__}")
+
+    pattern = re.compile(r'<p>\s*<em>\s*<br\s*/?>\s*\r?\n?\s*</em>\s*</p>', re.IGNORECASE)
+    
+    # Remove empty paragraphs
+    cleaned_html = re.sub(pattern, '', html)
+
+    return cleaned_html
+
 # Function to replace tables and store captions safely
 def table_replacer(match, counter=[0]):
     table_html = match.group(0)
@@ -608,11 +636,18 @@ def table_replacer(match, counter=[0]):
     caption_match = re.search(r'<caption.*?>(.*?)</caption>', table_html, re.DOTALL)
     caption_text = caption_match.group(1).strip() if caption_match else ""
 
+    # Add in caption prefix that is misplaced by pypandoc
+    if not caption_text.startswith("<p>Table"):
+        print(f"'Table ' not found in caption text for table {counter[0]}. Adding manually as: Table {counter[0]+1}{caption_text}")
+        caption_text = f"Table {counter[0]+1}{caption_text}"
+
     # Escape caption for safe inclusion in HTML attributes
     caption_escaped = html.escape(caption_text)  # <-- This should work now
 
+
+
     # Replace table with a div containing the caption as a data attribute
-    replacement = f'<div data-table="table_{counter[0]}" data-caption="{caption_escaped}"></div>'
+    replacement = f'<div data-table="table_{counter[0]}" data-caption="{caption_escaped}"></div><br>'
     
     counter[0] += 1
     return replacement
@@ -705,10 +740,16 @@ def replace_images_with_placeholders(html_content, alt_text_map):
         re.IGNORECASE | re.DOTALL
     )
 
-    def replacer(match):
+    def replacer(match, counter=[0]):
         img_src = match.group(2)  # Extract src
         alt_text = match.group(3) if match.group(3) else ""  # Extract alt text
         figcaption_text = match.group(5).strip() if match.group(5) else ""  # Extract figcaption text
+        # Add in caption prefix that is misplaced by pypandoc
+        if not figcaption_text.startswith("<p>Figure "):
+            figure_number_str = re.sub('image', '', list(alt_text_map.keys())[counter[0]])
+            figure_number = int(figure_number_str)-1 ## -1 to adjust for removal of first image in lua script
+            print(f"'Figure ' not found in caption text for table {counter[0]}. Adding manually as: Figure {figure_number}{figcaption_text}") ##
+            figcaption_text = f"Figure {figure_number}{figcaption_text}"
 
         img_id = os.path.splitext(os.path.basename(img_src))[0]  # Extract image ID
 
@@ -725,7 +766,7 @@ def replace_images_with_placeholders(html_content, alt_text_map):
 
         # ✅ Store caption inside the div like tables (escaped for HTML safety)
         placeholder_html = f'<div data-image="{alt_text_map[img_id]["path"]}" data-caption="{figcaption_escaped}">{alt_text_map[img_id]["alt_text"]}</div><br>'
-
+        counter[0] += 1
         return placeholder_html
 
     # Apply regex replacement
@@ -757,6 +798,7 @@ def convert_docx_to_html(doc_path: str, lua_script: str,  keep_images: list):
         extra_args=[
             "--quiet",
             f"--lua-filter={lua_script}",  # Replace with your actual Lua filter file
+            "--extract-media=.",  # Extract media to the current directory
             "--metadata", f"keep_images={metadata_json}"  # Pass as JSON
         ]
     )

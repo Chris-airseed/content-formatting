@@ -1,7 +1,6 @@
 -- Removes first 3 blocks from docx file to remove title page of the document
 -- Removes images from docx file based on metadata.keep_images
 
-
 -- Removes all page breaks that interfere with the conversion to HTML 
 -- Works but didn't fix issue with figures with page breaks directly after them not being considered as figures
 -- function Para (elem)
@@ -21,7 +20,6 @@
 --     return elem
 -- end
 
-
 local image_counter = 0
 local keep_set = {} -- Lookup table of images to keep
 local image_positions = {} -- Maps image index to element
@@ -39,7 +37,6 @@ function debug_log(...)
     log_file:write(msg .. "\n")
     log_file:flush()
 end
-
 
 -- First pass: Collect image positions
 function CollectImages(el)
@@ -65,6 +62,14 @@ function Image(el)
     return el
 end
 
+-- Ensure Pandoc does not strip caption numbers
+function Figure(el)
+    if el.caption and el.caption.long and el.caption.long[1] then
+        debug_log("DEBUG: Preserving figure caption:", pandoc.utils.stringify(el.caption.long))
+        return el
+    end
+end
+
 -- Modify Pandoc document
 function Pandoc(doc)
     debug_log("DEBUG: Raw metadata content:", doc.meta)
@@ -88,7 +93,7 @@ function Pandoc(doc)
     debug_log("DEBUG: Total images found:", image_counter)
 
     debug_log("DEBUG: Filtering images...")
-    local processed_blocks = pandoc.walk_block(pandoc.Div(doc.blocks), { Image = Image }).content
+    local processed_blocks = pandoc.walk_block(pandoc.Div(doc.blocks), { Image = Image, Figure = Figure }).content
     debug_log("DEBUG: Number of blocks after image filtering:", #processed_blocks)
 
     -- Now remove the first three blocks AFTER processing images
