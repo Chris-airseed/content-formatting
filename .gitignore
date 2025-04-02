@@ -1,5 +1,7 @@
 # Testing
 tests/
+examples/04_multi-page-tsx/app/
+examples/04_multi-page-tsx/lua_log.txt
 examples/03_multi-page/app/
 examples/03_multi-page/lua_log.txt
 examples/02_floating_nav/app/
