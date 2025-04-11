@@ -481,10 +481,11 @@ def extract_table_format(doc_path, default_styles: dict = DEFAULT_STYLES):
                                 alt_text = doc_pr.attrib.get('descr', '').strip()
                                 if alt_text:
                                     img_match = {"alt_text": (alt_text)}
-                                    print(img_matches)
-                                    _, image_type, image_alt_text = alt_text.split("-")
+                                    _, image_type, *image_alt_text = alt_text.split("-")
+                                    image_alt_text = "-".join(image_alt_text)
+                                    icon_class, icon_name = image_alt_text.split(":")
                                     if image_type == "icon":
-                                        img_match["iconHtml"] = f"<span class='material-symbols-outlined'>{image_alt_text}</span>"
+                                        img_match["iconHtml"] = f"<span class={icon_class}>{icon_name}</span>"
                                         img_match["iconPosition"] = "start" #TODO make dynamic based on actual position in cell: could also be top, bottom, end
                                     else:
                                         print("Images not supported in tables yet...")
@@ -869,23 +870,263 @@ def get_figure_captions(html_content, doc_img_src: list) -> namedtuple:
 
     return result
 
-def identify_image_type(images_dict: dict):
-    # split into icons, charts, and images
-    icons = {}
-    charts = {}
-    images = {}
-    for key, value in images_dict.items():
-        print(value)
-        if value.startswith("icon"):
-            print(f"starts with icon: {value}")
-            icons[key] = value.replace("icon-", "")
-        elif value.startswith("chart"):
-            print(f"starts with chart: {value}")
-            charts[key] = value.replace("chart-", "")
+# def identify_image_type(images_dict: dict):
+#     # split into icons, charts, and images
+#     icons = {}
+#     charts = {}
+#     images = {}
+#     for key, value in images_dict.items():
+#         print(value)
+#         if value.startswith("icon"):
+#             print(f"starts with icon: {value}")
+#             icons[key] = value.replace("icon-", "")
+#         elif value.startswith("chart"):
+#             print(f"starts with chart: {value}")
+#             charts[key] = value.replace("chart-", "")
+#         else:
+#             print(f"starts with image: {value}")
+#             images[key] = value
+#     return icons, charts, images
+
+
+import os
+import xml.etree.ElementTree as ET
+from zipfile import ZipFile
+import re
+from enum import Enum
+
+def parse_images_with_links_and_captions(docx_path):
+    """
+    Extracts each image instance from a .docx file with:
+    - image file path
+    - hyperlink (if any)
+    - image metadata (descr / name)
+    - associated figure caption and number
+    - inferred numbering scheme
+    """
+    image_info = []
+    
+    with ZipFile(docx_path) as docx_zip:
+        document_xml = ET.fromstring(docx_zip.read("word/document.xml"))
+        rels_xml = ET.fromstring(docx_zip.read("word/_rels/document.xml.rels"))
+
+    NS = {
+        'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+        'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
+        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+        'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture',
+        'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+    }
+    RELS_NS = '{http://schemas.openxmlformats.org/package/2006/relationships}'
+
+    # Map rId → Target (image or link)
+    rels_lookup = {
+        rel.attrib['Id']: rel.attrib['Target']
+        for rel in rels_xml.findall(f"{RELS_NS}Relationship")
+    }
+
+    # Get all paragraphs (for matching captions)
+    paragraphs = document_xml.findall('.//w:p', NS)
+
+    for i, paragraph in enumerate(paragraphs):
+        drawing = paragraph.find('.//w:drawing', NS)
+        if drawing is not None:
+            # Metadata
+            docpr = drawing.find('.//wp:docPr', NS)
+            descr = docpr.attrib.get("descr") if docpr is not None else ""
+            name = docpr.attrib.get("name") if docpr is not None else ""
+
+            # Image
+            blip = drawing.find('.//a:blip', NS)
+            img_rid = blip.attrib.get(f"{{{NS['r']}}}embed") if blip is not None else None
+            img_target = rels_lookup.get(img_rid)
+
+            # Hyperlink
+            hlink = drawing.find('.//a:hlinkClick', NS)
+            link_rid = hlink.attrib.get(f"{{{NS['r']}}}id") if hlink is not None else None
+            link_target = rels_lookup.get(link_rid)
+
+            # Try to get caption from the NEXT paragraph
+            caption_para = paragraphs[i + 1] if i + 1 < len(paragraphs) else None
+            fig_label, fig_number, caption_text, numbering_type, fig_caption = None, None, "", "", ""
+
+            if caption_para is not None:
+                # Look for caption text and figure numbering
+                texts = caption_para.findall('.//w:t', NS)
+                fld = caption_para.find('.//w:fldSimple', NS)
+                instr = fld.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}instr') if fld is not None else ""
+
+                if 'SEQ Figure' in instr:
+                    match = re.search(r'SEQ Figure(\\\* [A-Z]+)?', instr)
+                    if match:
+                        if '\\* ARABIC' in instr:
+                            numbering_type = "numeric"
+                        elif '\\* ALPHABETIC' in instr:
+                            numbering_type = "alphabetic"
+                        elif '\\* ROMAN' in instr:
+                            numbering_type = "roman"
+                        else:
+                            numbering_type = "unknown"
+
+                    # Get actual number from <w:t> inside fldSimple
+                    fig_number_elem = fld.find('.//w:t', NS)
+                    fig_number = fig_number_elem.text if fig_number_elem is not None else None
+
+                    # Get caption text from rest of paragraph
+                    caption_text = ''.join(t.text for t in texts).strip()
+
+                    # Try to isolate "Figure X" as label
+                    fig_label = re.match(r'Figure\s+\S+', caption_text)
+                    fig_label = fig_label.group(0) if fig_label else f"Figure {fig_number}"
+
+                    # Extract prefix before "Figure"
+                    # Extract everything before "Figure X" (with flexible matching)
+                    if fig_number:
+                        # Updated pattern to match "Figure" followed by an optional letter and then capture the caption
+                        pattern = r'^(Figure(?: [A-Z])?)(\s*)(.*)'
+                        match = re.match(pattern, caption_text)
+                        if match:
+                            fig_prefix, space, fig_suffix = match.groups()
+                            fig_label = fig_prefix + space
+                            fig_caption = fig_suffix[len(fig_number):] ## remove the number from caption text
+
+            image_info.append({
+                "image_id": img_rid,
+                "image_file": f"./{img_target}",
+                "link_id": link_rid,
+                "link_url": link_target,
+                "alt_text": descr or name or "",
+                "figure_number": fig_number,
+                "figure_label": fig_label,
+                "figure_caption": fig_caption,
+                "caption_text": caption_text,
+                "numbering_type": numbering_type
+            })
+
+    return image_info
+
+
+# Create new figure captions
+def update_figure_numbers(keep_image_map):
+    """
+    Update figure numbers in the image map based on new postion.
+    For example if Figures 1-3 are removed, then Figure 4 becomes Figure 1.
+    """
+    figure_counter = {}
+    for image in keep_image_map:
+        if image["figure_number"] is not None:
+            # Extract the figure number from the caption text
+            figure_prefix = image["figure_label"]
+            if figure_prefix not in figure_counter:
+                figure_counter[figure_prefix] = 1
+            else:
+                figure_counter[figure_prefix] += 1
+            # Update the figure number and caption text
+            image["figure_number_new"] = str(figure_counter[figure_prefix])
+            image["caption_text_new"] = ''.join([image["figure_label"], image["figure_number_new"], image["figure_caption"]])
         else:
-            print(f"starts with image: {value}")
-            images[key] = value
-    return icons, charts, images
+            image["figure_number_new"] = None
+            
+    return keep_image_map
+
+
+# remove keep from alt text
+def identify_image_type(keep_image_map):
+    for keep_image in keep_image_map:
+        _, image_type, *image_alt_text = keep_image["alt_text"].split("-")
+        image_alt_text = "-".join(image_alt_text)
+        print(image_type)
+        if image_type == "icon":
+            keep_image["image_type"] = image_type
+            ## Add additional tags
+            icon_class, icon_name = image_alt_text.split(":")
+            keep_image["class"] = icon_class
+            keep_image["icon"] = icon_name
+            ##TODO come up with another way of storing icon caption
+            ## check if there is a caption - Nowhere else to store caption text because the risk icons include the caption in the image
+            # if len(alt_text_split) > 2:
+            #     keep_image["caption"] = alt_text_keep_removed.split("-")[2]
+        elif image_type == "chart":
+            keep_image["image_type"] = image_type
+            ## Add additional tags
+            keep_image["chart"] = image_alt_text
+        elif image_type == "image":
+            keep_image["image_type"] = image_type
+            ## Add additional tags
+            keep_image["alt_text_new"] = image_alt_text
+
+    return keep_image_map
+
+def replace_images_with_divs(html_content, image_mapping):
+
+    class IconType(Enum):
+        DROUGHT = "{{droughtRisk}}"
+        FLOOD = "{{floodRisk}}"
+        BUSHFIRE = "{{bushfireRisk}}"
+
+
+    # Parse HTML
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Process all <img> tags with the source matches the image dictionary key in image_mapping
+    for i, img in enumerate(soup.find_all('img')):
+        image_meta = image_mapping[i]
+        src = img.get('src')
+        alt_text = img.get('alt')
+
+        if src == image_meta["image_file"] and alt_text == image_meta["alt_text"]:
+            print(image_meta)
+            if image_meta["image_type"] == "icon": ## Caption for the risk icon can be pulled in dynamically in content-snippets.json
+                print("icon")
+                # Replace <img> tag with <div> tag with data-icon attribute
+                div_tag = soup.new_tag("div")
+                div_tag['data-icon-name'] = image_meta["icon"]
+                print(image_meta["icon"])
+                div_tag['data-icon-type'] = image_meta["class"].split("-")[0]
+                if image_meta["class"] != "custom":
+                    div_tag['data-style'] = image_meta["class"].split("-")[2]
+                if image_meta["icon"] == "drought":
+                    div_tag['data-caption'] = IconType.DROUGHT.value
+                elif image_meta["icon"] == "flood":
+                    div_tag['data-caption'] = IconType.FLOOD.value
+                elif image_meta["icon"] == "bushfire":
+                    div_tag['data-caption'] = IconType.BUSHFIRE.value
+                div_tag.string = f""
+                div_tag['class'] = "icon"
+                if image_meta["link_url"] != "" and image_meta["link_url"] is not None:
+                    div_tag['data-link'] = image_meta["link_url"]
+                img.replace_with(div_tag)
+
+            elif image_meta["image_type"] == "chart":
+                print("chart")
+                if src == image_meta["image_file"] and alt_text == image_meta["alt_text"]:
+                    # Replace <img> tag with <div> tag with data-icon attribute
+                    div_tag = soup.new_tag("div")
+                    div_tag['id'] = image_meta["chart"] ## chart is a unique identifier for the chart hence used as id
+                    div_tag['data-caption'] = image_meta["caption_text_new"]
+                    div_tag.string = f""
+                    div_tag['class'] = "chart"
+                    if image_meta["link_url"] != "" and image_meta["link_url"] is not None:
+                        div_tag['data-link'] = image_meta["link_url"]
+                    img.replace_with(div_tag)
+
+            elif image_meta["image_type"] == "image":
+                print("image")
+                # Replace <img> tag with <div> tag with data-icon attribute
+                div_tag = soup.new_tag("div")
+                div_tag['data-src'] = f"./assets/{image_meta["alt_text_new"]}.png" ## chart is a unique identifier for the chart hence used as id
+                div_tag['data-caption'] = image_meta["caption_text_new"]
+                div_tag.string = f""
+                div_tag['class'] = "image"
+                if image_meta["link_url"] != "" and image_meta["link_url"] is not None:
+                    div_tag['data-link'] = image_meta["link_url"]
+                img.replace_with(div_tag)
+
+            print(f"Image {i} replaced with <div> tag with data-icon attribute: {div_tag}")
+        else:
+            print(f"Image {i} does not match the criteria for replacement.")
+    # Get updated HTML as string
+    return str(soup)
 
 def replace_icons_with_placholders(html_content, icons_src: dict):
     # Parse HTML
@@ -932,7 +1173,7 @@ def replace_charts_with_placeholders(html_content, charts_src: dict, figure_capt
                     key = os.path.splitext(src_basename)[0]
                     print("looking up caption for key: ", key)
                     if key in figure_captions:
-                        chart_div['data-caption'] = f"{figure_captions[key].figure_caption}"
+                        chart_div['data-caption'] = f"Figure {figure_captions[key].figure_number}{figure_captions[key].figure_caption}"
                     # else:
                     #     chart_div['caption'] = "No caption available"
 
@@ -971,7 +1212,7 @@ def replace_images_with_placeholders(html_content, images_src: dict, figure_capt
                     key = os.path.splitext(src_basename)[0]
                     print("looking up caption for key: ", key)
                     if key in figure_captions:
-                        image_div['data-caption'] = f"{figure_captions[key].figure_caption}"
+                        image_div['data-caption'] = f"Figure {figure_captions[key].figure_number}{figure_captions[key].figure_caption}"
                     # else:
                     #     image_div['caption'] = "No caption available"
 
