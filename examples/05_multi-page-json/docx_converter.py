@@ -36,6 +36,8 @@ GLOBAL_DEFAULT_STYLES = {
     "verticalAlign": "middle"
 }
 
+print(GLOBAL_DEFAULT_STYLES)
+
 def check_compatibility(docx_path, output_path):
     """Check compatibility of docx file and fix or flag any potential issues."""
     ## Load the document
@@ -460,11 +462,11 @@ def extract_table_format(doc_path, default_styles: dict = DEFAULT_STYLES):
 
                 # Determine default style based on position
                 if row_idx == 0:
-                    default_style = DEFAULT_STYLES["th"]
+                    default_style = default_styles["th"]
                 elif col_idx == 0:
-                    default_style = DEFAULT_STYLES["td1"]
+                    default_style = default_styles["td1"]
                 else:
-                    default_style = DEFAULT_STYLES["td"]
+                    default_style = default_styles["td"]
 
                 # Extract formatting and text as separate parts
                 text_parts = []
@@ -513,7 +515,7 @@ def extract_table_format(doc_path, default_styles: dict = DEFAULT_STYLES):
                                     if run.font.subscript:
                                         part["subscript"] = True
                                     if run.font.color and run.font.color.rgb:
-                                        part["color"] = f"#{run.font.color.rgb}"
+                                        part["color"] = f"#{run.font.color.rgb}" if f"#{run.font.color.rgb}" != default_style.get("color") else None
                                     if run.font.size:
                                         part["fontSize"] = convert_pt_to_rem(run.font.size.pt)
 
@@ -572,9 +574,12 @@ def extract_table_format(doc_path, default_styles: dict = DEFAULT_STYLES):
                     for i in range(1, merge_info["rowSpan"]):  # Track vertically merged cells
                         merge_tracker[(row_idx + i, col_idx)] = merge_info["rowSpan"] - i
 
-                # Extract other styles
-                actual_style["textAlign"] = get_paragraph_alignment(cell.paragraphs[0]) if cell.paragraphs else None
-                actual_style["verticalAlign"] = map_vertical_align(get_cell_vertical_alignment(cell))
+                # Extract other styles and replace if they differ from default
+                cell_text_align = get_paragraph_alignment(cell.paragraphs[0]) if cell.paragraphs else default_style.get("textAlign", "left")
+                
+                actual_style["textAlign"] = cell_text_align if cell_text_align != default_style["textAlign"] else None
+                cell_vertical_align = map_vertical_align(get_cell_vertical_alignment(cell))
+                actual_style["verticalAlign"] = cell_vertical_align if cell_vertical_align != default_style["verticalAlign"] else None
 
                 # Extract background color
                 shading = cell._element.xpath('.//w:shd/@w:fill')
